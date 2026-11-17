@@ -5,7 +5,7 @@
 [![CI](https://github.com/rajatslakhina/code-mode-runtime-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/rajatslakhina/code-mode-runtime-kit/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-orange) ![Platforms](https://img.shields.io/badge/platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20Linux%20(core)-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-**Demo app:** [code-mode-runtime-demo-app](https://github.com/rajatslakhina/code-mode-runtime-demo-app), a SwiftUI app that runs five plans (parallel review, a delete that has to ask you, an exfiltration attempt, a runaway loop, a write in a read-only run) against this package, pinned to `1.0.0`.
+**Demo app:** [code-mode-runtime-demo-app](https://github.com/rajatslakhina/code-mode-runtime-demo-app), a SwiftUI app that runs five plans (parallel review, a delete that has to ask you, an exfiltration attempt, a runaway loop, a write in a read-only run) against this package, consumed from GitHub as a version-pinned remote package.
 
 ---
 
@@ -86,7 +86,7 @@ case .budgetExhausted, .deadlineExceeded, .scriptFailed, .rejected, .cancelled:
 Add it with SwiftPM:
 
 ```swift
-.package(url: "https://github.com/rajatslakhina/code-mode-runtime-kit.git", from: "1.0.0")
+.package(url: "https://github.com/rajatslakhina/code-mode-runtime-kit.git", from: "1.0.1")
 ```
 
 ## Design decisions and trade-offs
@@ -123,13 +123,14 @@ Add it with SwiftPM:
 
 ## Verification
 
-What was run for v1.0.0, and on what:
+What was run, and on what:
 
-- **macOS (Xcode 27.2, Swift 6.4.2):** clean `swift build --build-tests -Xswiftc -warnings-as-errors` with **0 warnings**. `swift test` passed **72/72**, including **15 end-to-end tests against real JavaScriptCore**. The 69 tests that don't leave a thread spinning passed **10 consecutive runs**.
+- **macOS (Xcode 27.2, Swift 6.4.2):** clean `swift build --build-tests -Xswiftc -warnings-as-errors` with **0 warnings**. `swift test` passed **72/72**, including **15 end-to-end tests against real JavaScriptCore**. The 69 tests that run by default passed **10 consecutive runs**.
+- **Three opt-in tests** deliberately leave a thread spinning (a stuck `while (true) {}`, a script that settles and then spins, and a replay of a stuck script). They run only with `CODEMODE_RUN_SPINNING_TESTS=1`. They pass locally on macOS 27.2, but on GitHub's macos-15 runners the test process never exits once those threads spin, so CI skips them. They were run locally before this release.
 - **Linux (Swift 6.0.3):** clean build with warnings as errors. `swift test` passed **57/57** in **25 consecutive runs**. The 15 JavaScriptCore tests are Apple-only; on Linux the runtime, bridge and replayer are covered through a `FakeEngine`.
 - **iOS:** `xcodebuild build -scheme CodeModeKit -destination 'generic/platform=iOS Simulator' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` succeeded.
-- **Mutation check:** `scripts/mutation-check.sh` brings back **29** specific bugs, one at a time, and each one must make a test fail. **29/29 caught.** A mutant that makes the suite hang is killed after 600 s and counted as caught. Run it on macOS, because several mutants live in the JavaScriptCore engine.
-- **CI:** the [Actions workflow](https://github.com/rajatslakhina/code-mode-runtime-kit/actions/workflows/ci.yml) runs on pushes to `main`, on tags and on pull requests. It has three jobs: Linux (Swift 6.0, build with warnings as errors, then test); macOS (tests with warnings as errors, the spinning-thread tests in their own step, and the generic iOS Simulator build); and the mutation check on macOS.
+- **Mutation check:** `scripts/mutation-check.sh` brings back specific bugs one at a time, and each one must make a test fail. Locally, with the spinning tests enabled, **29/29 were caught**. CI runs the **27** mutants that don't depend on the opt-in tests. A mutant that makes the suite hang is killed after 600 s and counted as caught. Run it on macOS, because several mutants live in the JavaScriptCore engine.
+- **CI:** the [Actions workflow](https://github.com/rajatslakhina/code-mode-runtime-kit/actions/workflows/ci.yml) runs on pushes to `main`, on tags and on pull requests. It has three jobs: Linux (Swift 6.0, build with warnings as errors, then test); macOS (tests with warnings as errors, then the generic iOS Simulator build); and the 27-mutant check on macOS.
 - **Simulator:** the library has no UI. The [demo repo](https://github.com/rajatslakhina/code-mode-runtime-demo-app) says exactly what was run on a Simulator and screenshotted.
 - **Review:** three rounds of independent review. Every blocking issue they raised is fixed. The fixes from the last round were checked by the test runs above, not by a fourth review.
 

@@ -34,8 +34,6 @@ MUTANTS=(
   "$S/CodeModeRuntime.swift|if engineBusy { abandoned = Saturating.add(abandoned, 1) }|abandoned = Saturating.add(abandoned, 1)|only engines that were still running count against quarantine"
   "$S/JavaScriptCoreEngine.swift|let overLimit = ordinal >= limits.maxHostCalls \|\| isFinished|let overLimit = isFinished|a synchronous call flood never queues more than maxHostCalls Swift tasks"
   "$S/JavaScriptCoreEngine.swift|        context.globalObject.deleteProperty(\"eval\")|        // eval kept|eval is removed from the context"
-  "$S/JavaScriptCoreEngine.swift|        busy = true|        busy = false|a script stuck in a synchronous loop is reported busy and counted"
-  "$S/JavaScriptCoreEngine.swift|        if depth > 0 {|        if false {|a script that settles and then keeps spinning is not reported as completed"
   "$S/JavaScriptCoreEngine.swift|        Object.defineProperty(proto, \"constructor\", { value: blocked, writable: false, configurable: false });|        // constructors left alone|the Function constructors cannot compile strings"
   "$S/CodeModeRuntime.swift|        case .settled where exhausted, .settled(.failure(.hostCallLimitExceeded)):|        case .settled(.failure(.hostCallLimitExceeded)):|a refused-for-budget run is a budget stop whether or not the script caught the refusal"
   "$S/TraceReplayer.swift|        onDivergence.yield()|        _ = onDivergence|a diverged replay stops instead of looping until the deadline"
@@ -43,6 +41,15 @@ MUTANTS=(
   "$S/TraceReplayer.swift|if let missing = await ledger.firstUnanswered, outcome != nil {|if false, let missing = await ledger.firstUnanswered, outcome != nil {|replay detects a skipped call"
   "$S/Saturating.swift|        return b > 0 ? .max : .min|        return result|counts saturate instead of wrapping"
 )
+# Mutants that only the opt-in spinning-thread tests can catch. They run when
+# CODEMODE_RUN_SPINNING_TESTS=1 (locally, before a release); CI skips them because
+# those tests hang the test process on GitHub's macos-15 runners.
+if [ "${CODEMODE_RUN_SPINNING_TESTS:-}" = "1" ]; then
+  MUTANTS+=(
+  "$S/JavaScriptCoreEngine.swift|        busy = true|        busy = false|a script stuck in a synchronous loop is reported busy and counted"
+  "$S/JavaScriptCoreEngine.swift|        if depth > 0 {|        if false {|a script that settles and then keeps spinning is not reported as completed"
+  )
+fi
 # A mutant that makes a test hang (killed after 600 s) counts as caught, not as a
 # stuck job. The README says so.
 # macOS has no `timeout`; perl's alarm is a portable fallback.

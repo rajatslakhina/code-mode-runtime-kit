@@ -186,9 +186,15 @@ final class JavaScriptCoreEngineTests: XCTestCase {
 
 /// Tests that deliberately leave a thread spinning until the process exits (public
 /// JavaScriptCore API cannot interrupt a synchronous loop; that is the behaviour
-/// under test). CI runs them in a separate step so they don't steal cores from the
-/// timing-sensitive tests above.
+/// under test). Opt-in with `CODEMODE_RUN_SPINNING_TESTS=1`: on GitHub's macos-15
+/// runners the test process never exits once these threads are spinning, so CI
+/// skips them and they are run locally before each release (see the README).
 final class JavaScriptCoreSpinningTests: XCTestCase {
+    override func setUpWithError() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CODEMODE_RUN_SPINNING_TESTS"] == "1",
+                          "set CODEMODE_RUN_SPINNING_TESTS=1 to run tests that leave a thread spinning")
+    }
+
     func runtime(_ fixture: Fixture) throws -> CodeModeRuntime {
         CodeModeRuntime(registry: try fixture.registry(), confirmations: DenyAllConfirmations()) { JavaScriptCoreEngine() }
     }
