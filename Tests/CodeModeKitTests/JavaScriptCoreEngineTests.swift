@@ -126,6 +126,33 @@ final class JavaScriptCoreEngineTests: XCTestCase {
         XCTAssertEqual(report.executedCalls, 3)
     }
 
+    func testEngineHostCallCapIsExactAndEndsTheRun() async throws {
+        // The engine on its own, with a host that never refuses, so no bridge timing
+        // is involved: 1,000 synchronous calls, cap 10. Exactly 10 may reach Swift,
+        // and the run ends with hostCallLimitExceeded instead of completing.
+        let reached = Counter()
+        let host: ScriptHost = { _ in
+            await reached.increment()
+            return .success("[]")
+        }
+        let prelude = try Fixture().registry().prelude(in: CapabilityScope())
+        do {
+            _ = try await JavaScriptCoreEngine().execute(
+                script: """
+                const pending = [];
+                for (let i = 0; i < 1000; i++) pending.push(tools.listExpenses({ month: "2026-11" }));
+                return pending.length;
+                """,
+                prelude: prelude, limits: EngineLimits(maxHostCalls: 10), host: host)
+            XCTFail("the run must end at the cap")
+        } catch let error as ScriptError {
+            XCTAssertEqual(error, .hostCallLimitExceeded)
+        }
+        try await Task.sleep(for: .milliseconds(300)) // let any in-flight host tasks land
+        let count = await reached.value
+        XCTAssertEqual(count, 10)
+    }
+
     func testAwaitingScriptAtTheDeadlineIsReclaimed() async throws {
         let fixture = Fixture()
         let runtime = try runtime(fixture)
